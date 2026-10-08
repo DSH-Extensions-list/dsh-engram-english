@@ -1,37 +1,47 @@
 #!/usr/bin/env node
 /**
- * 嵌入回填：给已有但缺向量的记忆补算 embedding。
- * 场景：嵌入器曾降级（模型未就绪）时摄取/保存的记忆没有向量，
- * 语义检索上线后运行本脚本一次，让存量记忆参与向量道。
- *
- * 用法：node scripts/backfill-embeddings.mjs [dbDir]
- * 默认 dbDir = ~/.dsh/engram；只处理 active 且 embedding IS NULL 的条目。
+ * Backfill missing embeddings for active memories after the local model is available.
+ * Usage: node scripts/backfill-embeddings.mjs [dbDir]
+ * Defaults to ~/.dsh/engram and only updates active rows with NULL embeddings.
  */
 
 import { DatabaseSync } from 'node:sqlite'
+import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { pipeline, env } from '@huggingface/transformers'
 
 const dbDir = process.argv[2] ?? join(homedir(), '.dsh', 'engram')
 const modelCacheDir = join(dbDir, 'models')
-const MODEL_ID = 'Xenova/bge-small-zh-v1.5'
+const MODEL_ID = 'onnx-community/granite-embedding-small-english-r2-ONNX'
+const EXPECTED_DIMENSIONS = 384
 
-const dbs = ['user.db', 'project-db'].map(name => join(dbDir, name)).filter(p => {
-  try { return new DatabaseSync(p, { readOnly: true }) && true } catch { return false }
-})
+const dbs = (existsSync(dbDir) ? readdirSync(dbDir, { withFileTypes: true }) : [])
+  .filter(entry => entry.isFile() && (entry.name === 'user.db' || /^project-[a-f0-9]{24}\.db$/.test(entry.name)))
+  .map(entry => join(dbDir, entry.name))
+  .filter(path => {
+    try {
+      const db = new DatabaseSync(path, { readOnly: true })
+      db.close()
+      return true
+    } catch {
+      return false
+    }
+  })
 if (dbs.length === 0) {
-  console.log('[backfill] 未找到任何记忆分库，无需回填')
+  console.log('[backfill] No memory databases found; nothing to backfill.')
   process.exit(0)
 }
 
 env.cacheDir = modelCacheDir
-// 下载端点可经 HF_ENDPOINT 覆盖（镜像）；模型已在缓存时不会访问网络。
+// Override the download endpoint via HF_ENDPOINT (for a mirror); the cached model requires no network access.
 if (process.env.HF_ENDPOINT) env.remoteHost = process.env.HF_ENDPOINT
 const extractor = await pipeline('feature-extraction', MODEL_ID, { dtype: 'q8' })
 const embed = async text => {
   const output = await extractor([text], { pooling: 'mean', normalize: true })
-  return new Float32Array(output.tolist()[0])
+  const vector = new Float32Array(output.tolist()[0])
+  if (vector.length !== EXPECTED_DIMENSIONS) throw new Error(`${MODEL_ID} returned ${vector.length} dimensions; expected ${EXPECTED_DIMENSIONS}.`)
+  return vector
 }
 
 let patched = 0
@@ -39,18 +49,19 @@ for (const path of dbs) {
   const db = new DatabaseSync(path)
   const rows = db.prepare("SELECT id, content FROM nodes WHERE status = 'active' AND embedding IS NULL").all()
   if (rows.length === 0) {
-    console.log(`[backfill] ${path}: 无缺向量条目`)
+    console.log(`[backfill] ${path}: No entries with missing embeddings.`)
     db.close()
     continue
   }
-  db.exec('BEGIN')
+  const prepared = []
+  for (const row of rows) prepared.push({ row, vector: await embed(row.content) })
+  const update = db.prepare('UPDATE nodes SET embedding = ? WHERE id = ? AND content = ? AND embedding IS NULL')
+  db.exec('BEGIN IMMEDIATE')
   try {
-    for (const row of rows) {
-      const vector = await embed(row.content)
-      db.prepare('UPDATE nodes SET embedding = ? WHERE id = ?')
-        .run(new Uint8Array(vector.buffer, vector.byteOffset, vector.byteLength), row.id)
-      patched += 1
-      console.log(`[backfill] ${path}: ${row.content.slice(0, 24)}… ✓`)
+    for (const { row, vector } of prepared) {
+      const changes = update.run(new Uint8Array(vector.buffer, vector.byteOffset, vector.byteLength), row.id, row.content).changes
+      patched += Number(changes)
+      if (changes > 0) console.log(`[backfill] ${path}: ${row.content.slice(0, 24)}… ✓`)
     }
     db.exec('COMMIT')
   } catch (error) {
@@ -60,4 +71,4 @@ for (const path of dbs) {
   }
   db.close()
 }
-console.log(`[backfill] 完成：共补算 ${patched} 条向量`)
+console.log(`[backfill] Complete: backfilled ${patched} embeddings in total.`)

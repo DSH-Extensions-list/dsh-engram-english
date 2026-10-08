@@ -179,6 +179,7 @@ export async function runConsolidation(
 
 /** cosine 相似度（两个等长非零向量）。 */
 function cosine(a: Float32Array, b: Float32Array): number {
+  if (a.length !== b.length) return 0
   let dot = 0
   let na = 0
   let nb = 0

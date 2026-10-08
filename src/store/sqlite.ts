@@ -303,6 +303,7 @@ function observationRowToRecord(row: ObservationRow): ObservationRecord {
 
 /** 余弦相似度；任一向量零范数时返回 0。 */
 function cosine(a: Float32Array, b: Float32Array): number {
+  if (a.length !== b.length) return 0
   let dot = 0
   let na = 0
   let nb = 0
