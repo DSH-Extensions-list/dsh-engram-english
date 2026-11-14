@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * Symlink this plugin's @deepseek-ai/* peer dependencies from the deepseek-harness workspace into node_modules.
+ * 把本插件的 @deepseek-ai/* peer 依赖从 deepseek-harness 工作区 symlink 进 node_modules。
  *
- * Why not use file:/npm installs: internal harness packages use the workspace:^ protocol for dependencies,
- * which pnpm cannot resolve outside the workspace; the @deepseek-ai dependency chain on npm is also incomplete (dsh-type-meta is unpublished).
- * After symlinking, imports from linked packages to other @deepseek-ai/* packages resolve upward via their real paths (inside the harness tree)
- * to the harness's own workspace node_modules, automatically completing the transitive dependency chain.
+ * 为什么不用 file:/npm 安装：harness 内部包的 dependencies 使用 workspace:^ 协议，
+ * 脱离其工作区无法经 pnpm 解析；npm 上的 @deepseek-ai 依赖链也不完整（dsh-type-meta 未发布）。
+ * symlink 后，被链接包内部对其他 @deepseek-ai/* 的 import 会沿真实路径（harness 树内）
+ * 向上解析到 harness 自己的 workspace node_modules，传递链Automatic闭合。
  *
- * Prerequisite: deepseek-harness has run pnpm install && pnpm run build (lib/ artifacts exist).
- * Idempotent: existing links are skipped. In published installations these packages are peerDependencies provided by the dsh profile.
+ * 前置：deepseek-harness 已执行 pnpm install && pnpm run build（存在 lib/ 产物）。
+ * 幂等：已存在的链接跳过。发布形态下这些包是 peerDependencies，由 dsh profile 提供。
  */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, statSync } from 'node:fs'
@@ -16,11 +16,9 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const harnessRoot = process.env.DSH_SOURCE_ROOT
-  ? resolve(process.env.DSH_SOURCE_ROOT)
-  : resolve(repoRoot, '..', 'deepseek-harness')
+const harnessRoot = resolve(repoRoot, '..', 'deepseek-harness')
 
-/** Packages imported directly: the actual type and runtime entry points; transitive dependencies resolve within the harness tree. */
+/** 直接 import 的包：类型与运行时的真实入口；其传递依赖由 harness 树内解析闭合。 */
 const LINKED_PACKAGES = [
   ['@deepseek-ai/cordis', 'vendor/cordis'],
   ['@deepseek-ai/cosmokit', 'vendor/cosmokit'],
@@ -35,6 +33,8 @@ const LINKED_PACKAGES = [
   ['@deepseek-ai/dsh-client-ui-settings', 'packages/client/ui-settings'],
   ['@deepseek-ai/dsh-client-ui-renderer', 'packages/client/ui-renderer'],
   ['@deepseek-ai/dsh-client-ui-slots', 'packages/client/ui-slots'],
+  ['@deepseek-ai/dsh-client-ui-layout', 'packages/client/ui-layout'],
+  ['@deepseek-ai/dsh-client-ui-sidebar', 'packages/client/ui-sidebar'],
   ['@deepseek-ai/dsh-llm', 'packages/llm/llm'],
   ['@deepseek-ai/dsh-agent', 'packages/core/agent'],
   ['@deepseek-ai/dsh-scope', 'packages/core/scope'],
@@ -52,8 +52,8 @@ for (const [name, rel] of LINKED_PACKAGES) {
   const target = join(harnessRoot, rel)
   const link = join(scopeDir, name.split('/')[1])
   if (existsSync(link)) continue
-  // Gracefully skip: published installations or profile environments may lack the harness source tree; peers are provided by
-  // the profile's node_modules. Missing links must never cause installation to fail.
+  // 温和跳过：发布形态或 profile 安装环境没有 harness 源码树，peer 由
+  // profile 的 node_modules 提供；链接缺失绝不使安装失败。
   if (!existsSync(target)) {
     skipped += 1
     continue
@@ -61,4 +61,5 @@ for (const [name, rel] of LINKED_PACKAGES) {
   symlinkSync(target, link, 'dir')
   created += 1
 }
-console.log(`[link-peers] ok (created ${created} links, skipped ${skipped} peers without source trees, ${LINKED_PACKAGES.length} total)`)
+// 英文Output：这份摘要最常被贴进 issue/安装Daily志（贡献者含英文用户），中文注释留在源码内。
+console.log(`[link-peers] ok: created ${created}, skipped ${skipped} of ${LINKED_PACKAGES.length} peers${skipped === LINKED_PACKAGES.length ? ' (all already provided by the host profile — nothing to link, this is expected)' : ''}`)

@@ -1,7 +1,7 @@
 {
-  "name": "@kenz1117/dsh-engram",
-  "description": "Cross-session long-term memory for DeepSeek Harness (memory palace · AGI Architecture Exploration on dsh-market): dual-scope SQLite memory graph, hybrid retrieval, provenance audit, and a knowledge flywheel.",
-  "version": "0.7.15",
+  "name": "@arzvaak/dsh-engram-english",
+  "description": "Local-first cross-session long-term memory for DeepSeek Harness: dual-scope SQLite stores, hybrid FTS5 + local-vector retrieval with RRF, an evidence gate, provenance audit and SM-2 spaced repetition. 23 narrow tools, zero external services, zero API keys.",
+  "version": "0.13.10-english.20261114.1",
   "icon": "icon.svg",
   "logo": "icon-256.svg",
   "publishConfig": {
@@ -10,6 +10,10 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kenz1117/dsh-engram.git"
+  },
+  "homepage": "https://github.com/kenz1117/dsh-engram#readme",
+  "bugs": {
+    "url": "https://github.com/kenz1117/dsh-engram/issues"
   },
   "type": "module",
   "main": "./lib/index.js",
@@ -31,7 +35,11 @@
     "scripts/",
     "cordis.patch.yml",
     "icon.svg",
-    "icon-256.svg"
+    "icon-256.svg",
+    "CHANGELOG.md",
+    "i18n/",
+    "registry/",
+    "docs/agent-language-guide.ru.md"
   ],
   "dsh": {
     "bundle": {
@@ -45,10 +53,15 @@
     }
   },
   "scripts": {
-    "prepare": "node scripts/link-peers.mjs",
+    "prepare": "node scripts/link-peers.mjs && node scripts/ensure-build.mjs",
     "bundle": "tsdown",
     "watch": "tsdown --watch",
     "test": "vitest run",
+    "lint": "biome check src tests",
+    "coverage": "vitest run --coverage",
+    "check:hooks": "node scripts/check-hook-order.mjs",
+    "check:css": "node scripts/check-css-classes.mjs",
+    "check:layout": "node scripts/verify-panel-layout.mjs",
     "typecheck": "tsc --noEmit",
     "backfill": "node scripts/backfill-embeddings.mjs"
   },
@@ -63,7 +76,16 @@
     "method-of-loci",
     "memory",
     "long-term-memory",
+    "agent-memory",
     "cross-session",
+    "context-engineering",
+    "local-first",
+    "rag",
+    "vector-search",
+    "semantic-search",
+    "knowledge-graph",
+    "spaced-repetition",
+    "provenance",
     "sqlite",
     "fts5",
     "embeddings",
@@ -76,27 +98,45 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "*",
     "@deepseek-ai/dsh-agent": "*",
+    "@deepseek-ai/dsh-client-ui-layout": "*",
     "@deepseek-ai/dsh-llm": "*",
     "@deepseek-ai/dsh-tools": "*",
     "@deepseek-ai/schemastery": "*"
   },
-  "dependencies": {
-    "@huggingface/transformers": "^4.2.0"
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-agent": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-ui-layout": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-llm": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-tools": {
+      "optional": true
+    },
+    "@deepseek-ai/schemastery": {
+      "optional": true
+    }
+  },
+  "optionalDependencies": {
+    "@huggingface/transformers": "^4.3.2"
   },
   "devDependencies": {
-    "@types/node": "^26.4.0",
+    "@biomejs/biome": "^2.6.4",
+    "@types/node": "^26.6.6",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@vitest/coverage-v8": "^5.0.5",
     "lightningcss": "^1.32.0",
-    "tsdown": "^0.22.14",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.11"
+    "tsdown": "^0.23.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.4"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "onnxruntime-node",
-      "sharp",
-      "protobufjs"
-    ]
-  }
+  "packageManager": "pnpm@10.15.0"
 }
