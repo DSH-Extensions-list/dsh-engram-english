@@ -1,8 +1,16 @@
-# dsh-engram bundle patch：dsh plugin add @kenz1117/dsh-engram 时以单条目插入 profile 根，
-# 行 id 指向本插件 host 半（注册 engram_ 工具与画像注入）。
-# 本地实测配置：开启 light 档自动摄取（发布版不带此 config，默认 off）。
+# Preserve the English Granite model and existing local stores across the upstream upgrade.
 - insert:
     - id: dsh-engram
-      name: '@kenz1117/dsh-engram'
+      name: '@arzvaak/dsh-engram-english'
       config:
+        dbDir: '/home/sushi/.local/share/deepseek-harness/home/engram'
+        modelCacheDir: '/home/sushi/.local/share/deepseek-harness/home/engram/models'
         ingest: 'light'
+        historyBackfillIncludeSubagents: false
+        historyBackfillIncludeSeeded: false
+        historyBackfillIncludeNoCwd: false
+        language: 'en'
+        embedder:
+          kind: 'local'
+          localModel: 'onnx-community/granite-embedding-small-english-r2-ONNX'
+          localPooling: 'mean'

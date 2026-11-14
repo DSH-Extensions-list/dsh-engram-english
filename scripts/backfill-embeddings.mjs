@@ -189,7 +189,7 @@ async function createEmbedder(options) {
   try {
     transformers = await import('@huggingface/transformers')
   } catch {
-    throw new Error(`本地嵌入引擎未随插件安装（弱网安装可能跳过 optionalDependencies）。请网络稳定时更新/重装插件，或手动执行：pnpm add @huggingface/transformers --filter "@kenz1117/dsh-engram"`)
+    throw new Error(`本地嵌入引擎未随插件安装（弱网安装可能跳过 optionalDependencies）。请网络稳定时更新/重装插件，或手动执行：pnpm add @huggingface/transformers --filter "@arzvaak/dsh-engram-english"`)
   }
   const { env, pipeline } = transformers
   env.cacheDir = options.cacheDir
